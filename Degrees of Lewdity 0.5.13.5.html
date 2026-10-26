@@ -38,6 +38,105 @@
   ensure("sessionStorage");
 })();
 </script>
+<script>
+/* Needs system: thirst, hunger (food), bladder, bowels */
+(function(){
+  function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+  function ensure(V){
+    if (V.thirst == null) V.thirst = 25;
+    if (V.hunger == null) V.hunger = 20;
+    if (V.bladder == null) V.bladder = 15;
+    if (V.bowels == null) V.bowels = 10;
+    V.thirst = clamp(+V.thirst || 0, 0, 100);
+    V.hunger = clamp(+V.hunger || 0, 0, 100);
+    V.bladder = clamp(+V.bladder || 0, 0, 100);
+    V.bowels = clamp(+V.bowels || 0, 0, 100);
+  }
+  function color(v){
+    if (v >= 85) return "#e44";
+    if (v >= 60) return "#ea3";
+    return "#4a4";
+  }
+  function bar(label, val){
+    return '<div style="margin:2px 0;font-size:12px;">' + label + ' ' + Math.round(val) +
+      '<div style="height:6px;background:#333;border-radius:3px;overflow:hidden;">' +
+      '<div style="width:' + val + '%;height:100%;background:' + color(val) + ';"></div></div></div>';
+  }
+  function render(){
+    if (typeof State === "undefined" || !State.variables) return;
+    var V = State.variables;
+    ensure(V);
+    var el = document.getElementById("dol-needs-panel");
+    if (!el){
+      el = document.createElement("div");
+      el.id = "dol-needs-panel";
+      el.style.cssText = "position:fixed;bottom:8px;right:8px;z-index:10000;background:#111c;color:#eee;padding:8px 10px;border:1px solid #555;border-radius:6px;font-family:sans-serif;min-width:160px;pointer-events:auto;";
+      document.body.appendChild(el);
+    }
+    var warn = "";
+    if (V.thirst >= 90) warn += "<div style='color:#f66;font-size:11px;'>Very thirsty</div>";
+    if (V.hunger >= 90) warn += "<div style='color:#f66;font-size:11px;'>Very hungry</div>";
+    if (V.bladder >= 90) warn += "<div style='color:#f66;font-size:11px;'>Bladder full</div>";
+    if (V.bowels >= 90) warn += "<div style='color:#f66;font-size:11px;'>Bowels urgent</div>";
+    el.innerHTML =
+      "<b style='font-size:13px;'>Needs</b>" +
+      bar("Thirst", V.thirst) +
+      bar("Food", V.hunger) +
+      bar("Bladder", V.bladder) +
+      bar("Bowels", V.bowels) +
+      warn +
+      "<div style='margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;'>" +
+      "<button data-need='drink' style='font-size:11px;padding:2px 6px;'>Drink</button>" +
+      "<button data-need='eat' style='font-size:11px;padding:2px 6px;'>Eat</button>" +
+      "<button data-need='pee' style='font-size:11px;padding:2px 6px;'>Pee</button>" +
+      "<button data-need='poop' style='font-size:11px;padding:2px 6px;'>Poop</button>" +
+      "</div>";
+    el.querySelectorAll("button[data-need]").forEach(function(btn){
+      btn.onclick = function(){
+        var V = State.variables;
+        ensure(V);
+        var act = btn.getAttribute("data-need");
+        if (act === "drink") V.thirst = clamp(V.thirst - 35, 0, 100);
+        if (act === "eat") V.hunger = clamp(V.hunger - 40, 0, 100);
+        if (act === "pee") { V.bladder = clamp(V.bladder - 50, 0, 100); V.stress = clamp((V.stress||0) - 2, 0, 100); }
+        if (act === "poop") { V.bowels = clamp(V.bowels - 45, 0, 100); V.stress = clamp((V.stress||0) - 2, 0, 100); }
+        render();
+      };
+    });
+  }
+  function tick(){
+    if (typeof State === "undefined" || !State.variables) return;
+    var V = State.variables;
+    ensure(V);
+    // Rough per-passage time cost (~8 minutes of activity)
+    var m = 8;
+    V.thirst = clamp(V.thirst + m * 0.18, 0, 100);
+    V.hunger = clamp(V.hunger + m * 0.10, 0, 100);
+    V.bladder = clamp(V.bladder + m * 0.14, 0, 100);
+    V.bowels = clamp(V.bowels + m * 0.06, 0, 100);
+    // High needs add a little stress
+    if (V.thirst > 80) V.stress = clamp((V.stress||0) + 1, 0, 100);
+    if (V.hunger > 80) V.stress = clamp((V.stress||0) + 1, 0, 100);
+    if (V.bladder > 85) V.stress = clamp((V.stress||0) + 1, 0, 100);
+    if (V.bowels > 85) V.stress = clamp((V.stress||0) + 1, 0, 100);
+    render();
+  }
+  function boot(){
+    if (typeof jQuery !== "undefined") {
+      jQuery(document).on(":passageend", tick);
+      jQuery(document).on(":storyready", function(){ setTimeout(render, 300); });
+    }
+    // Fallback poll in case events miss
+    setInterval(function(){
+      if (document.getElementById("dol-needs-panel")) return;
+      render();
+    }, 2000);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
+
 
 <meta charset="UTF-8" />
 <title>Degrees of Lewdity</title>
